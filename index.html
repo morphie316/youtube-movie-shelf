@@ -597,8 +597,6 @@
     const signInBtn = document.getElementById('signInBtn');
     const signOutBtn = document.getElementById('signOutBtn');
     const authStatusEl = document.getElementById('authStatus');
-    const firebaseConfigInput = document.getElementById('firebaseConfigInput');
-    const saveConfigBtn = document.getElementById('saveConfigBtn');
 
     let items = loadItems();
     let activeContextItemId = null;
@@ -616,17 +614,17 @@
 
     signInBtn.addEventListener('click', async () => {
         if (!auth) {
-          const ok = await startFirebase(JSON.stringify(FIREBASE_CONFIG));
+          const ok = await startFirebase(FIREBASE_CONFIG);
           if (!ok) return;
         }
-
-      try {
-        const provider = new GoogleAuthProvider();
-        await signInWithPopup(auth, provider);
-      } catch (error) {
-        setAuthStatus(error.message || 'Sign-in failed.', true);
-      }
-    });
+      
+        try {
+          const provider = new GoogleAuthProvider();
+          await signInWithPopup(auth, provider);
+        } catch (error) {
+          setAuthStatus(error.message || 'Sign-in failed.', true);
+        }
+      });
 
     signOutBtn.addEventListener('click', async () => {
       try {
@@ -686,54 +684,45 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
     }
 
-    function safeParseConfig(raw) {
-      try {
-        return Function(`"use strict"; return (${raw});`)();
-      } catch {
-        return null;
-      }
-    }
-
     async function autoBootFirebase() {
-        await startFirebase(JSON.stringify(FIREBASE_CONFIG), true);
+        await startFirebase(FIREBASE_CONFIG, true);
       }
 
-    async function startFirebase(rawConfig, quiet = false) {
-      const config = safeParseConfig(rawConfig);
-      if (!config || !config.apiKey || !config.projectId || !config.appId) {
-        if (!quiet) setAuthStatus('That Firebase config does not look valid.', true);
-        return false;
+    async function startFirebase(config, quiet = false) {
+  if (!config || !config.apiKey || !config.projectId || !config.appId) {
+    if (!quiet) setAuthStatus('That Firebase config does not look valid.', true);
+    return false;
+  }
+
+  try {
+    firebaseApp = getApps().length ? getApps()[0] : initializeApp(config);
+    auth = getAuth(firebaseApp);
+    db = getFirestore(firebaseApp);
+
+    onAuthStateChanged(auth, (user) => {
+      currentUser = user;
+      updateAuthUi();
+
+      if (unsubscribeShelf) {
+        unsubscribeShelf();
+        unsubscribeShelf = null;
       }
 
-      try {
-        firebaseApp = getApps().length ? getApps()[0] : initializeApp(config);
-        auth = getAuth(firebaseApp);
-        db = getFirestore(firebaseApp);
-
-        onAuthStateChanged(auth, (user) => {
-          currentUser = user;
-          updateAuthUi();
-
-          if (unsubscribeShelf) {
-            unsubscribeShelf();
-            unsubscribeShelf = null;
-          }
-
-          if (user) {
-            listenToShelf(user.uid);
-          } else {
-            items = loadItems();
-            render();
-          }
-        });
-
-        if (!quiet) setAuthStatus('Firebase is ready on this device.');
-        return true;
-      } catch (error) {
-        if (!quiet) setAuthStatus(error.message || 'Firebase could not start.', true);
-        return false;
+      if (user) {
+        listenToShelf(user.uid);
+      } else {
+        items = loadItems();
+        render();
       }
-    }
+    });
+
+    if (!quiet) setAuthStatus('Firebase is ready on this device.');
+    return true;
+  } catch (error) {
+    if (!quiet) setAuthStatus(error.message || 'Firebase could not start.', true);
+    return false;
+  }
+}
 
     function updateAuthUi() {
       if (currentUser) {
