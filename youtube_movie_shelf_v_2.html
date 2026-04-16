@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>YouTube Movie Shelf</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --panel-2: #0b1220;
+      --text: #f8fafc;
+      --muted: #cbd5e1;
+      --accent: #e11d48;
+      --accent-2: #fb7185;
+      --border: #334155;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 18px;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, #020617 0%, #0f172a 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(1280px, calc(100% - 32px));
+      margin: 32px auto 64px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, rgba(225,29,72,.22), rgba(59,130,246,.12));
+      border: 1px solid rgba(255,255,255,.08);
+      box-shadow: var(--shadow);
+      border-radius: 24px;
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: clamp(1.8rem, 3vw, 2.8rem);
+      line-height: 1.1;
+    }
+
+    h2 {
+      margin: 0;
+      font-size: 1.35rem;
+    }
+
+    .sub {
+      margin: 0;
+      color: var(--muted);
+      max-width: 72ch;
+      line-height: 1.55;
+    }
+
+    .settings, .form-panel, .filters-panel, .section-shell {
+      background: rgba(17,24,39,.92);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .grid {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(12, 1fr);
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .span-12 { grid-column: span 12; }
+    .span-8 { grid-column: span 8; }
+    .span-6 { grid-column: span 6; }
+    .span-4 { grid-column: span 4; }
+    .span-3 { grid-column: span 3; }
+
+    label {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    input {
+      width: 100%;
+      padding: 14px 16px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      font-size: 1rem;
+      outline: none;
+    }
+
+    input:focus {
+      border-color: var(--accent-2);
+      box-shadow: 0 0 0 3px rgba(251,113,133,.15);
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    button {
+      border: none;
+      cursor: pointer;
+      color: white;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      padding: 14px 18px;
+      border-radius: 14px;
+      font-size: 1rem;
+      font-weight: 700;
+      box-shadow: var(--shadow);
+    }
+
+    button.secondary { background: #334155; }
+
+    button.ghost {
+      background: transparent;
+      border: 1px solid rgba(255,255,255,.14);
+      box-shadow: none;
+    }
+
+    .status {
+      margin-top: 10px;
+      min-height: 24px;
+      color: #93c5fd;
+      font-size: 0.95rem;
+    }
+
+    .small {
+      font-size: 0.9rem;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .section-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .count-badge {
+      color: var(--muted);
+      font-size: 0.95rem;
+    }
+
+    .shelf {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 18px;
+    }
+
+    .card {
+      background: rgba(17,24,39,.98);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 18px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+      display: flex;
+      flex-direction: column;
+      min-height: 100%;
+      position: relative;
+    }
+
+    .poster-link {
+      display: block;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .poster {
+      width: 100%;
+      aspect-ratio: 2 / 3;
+      object-fit: cover;
+      display: block;
+      background: #1e293b;
+    }
+
+    .poster.placeholder {
+      display: grid;
+      place-items: center;
+      padding: 20px;
+      text-align: center;
+      color: var(--muted);
+      font-weight: 600;
+    }
+
+    .watched-ribbon {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(15,23,42,.9);
+      border: 1px solid rgba(255,255,255,.12);
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 800;
+      z-index: 2;
+    }
+
+    .content {
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex: 1;
+    }
+
+    .title {
+      font-size: 1.05rem;
+      font-weight: 800;
+      line-height: 1.3;
+    }
+
+    .meta {
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.45;
+    }
+
+    .plot {
+      color: #e2e8f0;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: auto;
+    }
+
+    .actions a,
+    .actions button {
+      flex: 1;
+      text-align: center;
+      text-decoration: none;
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 0.92rem;
+      font-weight: 700;
+    }
+
+    .actions a {
+      background: #be123c;
+      color: white;
+    }
+
+    .actions .secondary-action {
+      background: #334155;
+      color: white;
+      box-shadow: none;
+    }
+
+    .empty {
+      padding: 24px;
+      text-align: center;
+      color: var(--muted);
+      border: 1px dashed rgba(255,255,255,.15);
+      border-radius: 18px;
+      background: rgba(15,23,42,.55);
+    }
+
+    .context-menu {
+      position: fixed;
+      z-index: 9999;
+      min-width: 220px;
+      background: rgba(15,23,42,.98);
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 14px;
+      box-shadow: 0 14px 40px rgba(0,0,0,.45);
+      overflow: hidden;
+      display: none;
+    }
+
+    .context-menu button {
+      width: 100%;
+      background: transparent;
+      border: none;
+      border-radius: 0;
+      box-shadow: none;
+      text-align: left;
+      padding: 12px 14px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .context-menu button:hover {
+      background: rgba(255,255,255,.08);
+    }
+
+    dialog {
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 20px;
+      background: #0f172a;
+      color: var(--text);
+      width: min(520px, calc(100% - 24px));
+      padding: 0;
+      box-shadow: 0 20px 60px rgba(0,0,0,.5);
+    }
+
+    dialog::backdrop {
+      background: rgba(2,6,23,.75);
+    }
+
+    .dialog-body {
+      padding: 20px;
+    }
+
+    .dialog-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+      margin: 0 0 14px;
+    }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 12px;
+      margin-top: 18px;
+      flex-wrap: wrap;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 0.9rem;
+      line-height: 1.5;
+      margin-top: 8px;
+    }
+
+    code {
+      background: rgba(255,255,255,.08);
+      padding: 2px 6px;
+      border-radius: 8px;
+    }
+
+    @media (max-width: 900px) {
+      .span-8, .span-6, .span-4, .span-3 { grid-column: span 12; }
+      .wrap { width: min(100% - 20px, 1280px); margin-top: 20px; }
+      .hero { padding: 20px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Your YouTube Movie Shelf</h1>
+      <p class="sub">
+        Save YouTube movie links and display them like a mini streaming library. Right click a poster for quick actions,
+        mark films as watched, and search by title, IMDb ID, year, genre, director, or actors.
+      </p>
+    </section>
+
+    <section class="settings">
+      <div class="grid">
+        <div class="field span-12">
+          <label for="apiKey">OMDb API key</label>
+          <input id="apiKey" type="text" placeholder="Paste your OMDb API key here" />
+        </div>
+      </div>
+      <p class="small">
+        Your key is stored only in your browser on this device. To use this on other devices, host this page online and use the same key there.
+      </p>
+    </section>
+
+    <section class="form-panel">
+      <div class="grid">
+        <div class="field span-8">
+          <label for="youtubeUrl">YouTube movie link</label>
+          <input id="youtubeUrl" type="url" placeholder="https://www.youtube.com/watch?v=..." />
+        </div>
+        <div class="field span-4">
+          <label for="movieYear">Year (optional)</label>
+          <input id="movieYear" type="text" placeholder="1999" inputmode="numeric" />
+        </div>
+        <div class="field span-12">
+          <label for="movieTitle">Movie title (recommended)</label>
+          <input id="movieTitle" type="text" placeholder="e.g. The Lost Boys" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px;">
+        <button id="addBtn">Add to shelf</button>
+        <button id="exportBtn" class="secondary" type="button">Export backup</button>
+        <label class="ghost" style="display:inline-flex; align-items:center; gap:8px; padding:14px 16px; border-radius:14px; border:1px solid rgba(255,255,255,.14); cursor:pointer;">
+          Import backup
+          <input id="importInput" type="file" accept="application/json" hidden />
+        </label>
+        <button id="clearBtn" class="ghost" type="button">Clear all</button>
+      </div>
+      <div id="status" class="status"></div>
+    </section>
+
+    <section class="filters-panel">
+      <div class="grid">
+        <div class="field span-12">
+          <label for="smartSearch">Search title (smart search)</label>
+          <input id="smartSearch" type="text" placeholder="Search title, plot, genre, director, actors..." />
+        </div>
+        <div class="field span-3">
+          <label for="imdbIdFilter">IMDb ID</label>
+          <input id="imdbIdFilter" type="text" placeholder="tt0110357" />
+        </div>
+        <div class="field span-3">
+          <label for="yearFilter">Year of release</label>
+          <input id="yearFilter" type="text" placeholder="1994" inputmode="numeric" />
+        </div>
+        <div class="field span-3">
+          <label for="genreFilter">Genre</label>
+          <input id="genreFilter" type="text" placeholder="Comedy" />
+        </div>
+        <div class="field span-3">
+          <label for="directorFilter">Director</label>
+          <input id="directorFilter" type="text" placeholder="Joe Dante" />
+        </div>
+        <div class="field span-12">
+          <label for="actorsFilter">Actors</label>
+          <input id="actorsFilter" type="text" placeholder="Corey Haim" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:14px;">
+        <button id="resetFiltersBtn" class="ghost" type="button">Reset filters</button>
+      </div>
+    </section>
+
+    <section class="section-shell">
+      <div class="section-header">
+        <div>
+          <h2>Unwatched</h2>
+          <div class="small">Things you still want to watch.</div>
+        </div>
+        <div class="count-badge" id="unwatchedCount"></div>
+      </div>
+      <div id="unwatchedShelf" class="shelf"></div>
+    </section>
+
+    <section class="section-shell">
+      <div class="section-header">
+        <div>
+          <h2>Watched</h2>
+          <div class="small">Things you have already watched.</div>
+        </div>
+        <div class="count-badge" id="watchedCount"></div>
+      </div>
+      <div id="watchedShelf" class="shelf"></div>
+    </section>
+  </div>
+
+  <div id="contextMenu" class="context-menu" role="menu" aria-hidden="true">
+    <button id="menuToggleWatched" type="button">Mark as watched</button>
+    <button id="menuEditImdb" type="button">Edit identification</button>
+    <button id="menuDelete" type="button">Delete</button>
+  </div>
+
+  <dialog id="editDialog">
+    <form method="dialog" class="dialog-body" id="editForm">
+      <p class="dialog-title">Edit identification</p>
+      <div class="field">
+        <label for="editImdbId">IMDb ID used by OMDb</label>
+        <input id="editImdbId" type="text" placeholder="tt0110357" />
+      </div>
+      <div class="hint">
+        Example format: <code>tt0110357</code>. Saving will re-fetch the poster and details from OMDb using this IMDb ID.
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="ghost" id="cancelEditBtn">Cancel</button>
+        <button type="submit" id="saveEditBtn">Save changes</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script>
+    const STORAGE_KEY = 'ytMovieShelfItems';
+    const KEY_STORAGE = 'ytMovieShelfOmdbKey';
+
+    const apiKeyInput = document.getElementById('apiKey');
+    const youtubeUrlInput = document.getElementById('youtubeUrl');
+    const movieTitleInput = document.getElementById('movieTitle');
+    const movieYearInput = document.getElementById('movieYear');
+    const addBtn = document.getElementById('addBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const importInput = document.getElementById('importInput');
+    const clearBtn = document.getElementById('clearBtn');
+    const statusEl = document.getElementById('status');
+
+    const smartSearchInput = document.getElementById('smartSearch');
+    const imdbIdFilterInput = document.getElementById('imdbIdFilter');
+    const yearFilterInput = document.getElementById('yearFilter');
+    const genreFilterInput = document.getElementById('genreFilter');
+    const directorFilterInput = document.getElementById('directorFilter');
+    const actorsFilterInput = document.getElementById('actorsFilter');
+    const resetFiltersBtn = document.getElementById('resetFiltersBtn');
+
+    const unwatchedShelf = document.getElementById('unwatchedShelf');
+    const watchedShelf = document.getElementById('watchedShelf');
+    const unwatchedCount = document.getElementById('unwatchedCount');
+    const watchedCount = document.getElementById('watchedCount');
+
+    const contextMenu = document.getElementById('contextMenu');
+    const menuToggleWatched = document.getElementById('menuToggleWatched');
+    const menuEditImdb = document.getElementById('menuEditImdb');
+    const menuDelete = document.getElementById('menuDelete');
+
+    const editDialog = document.getElementById('editDialog');
+    const editForm = document.getElementById('editForm');
+    const editImdbIdInput = document.getElementById('editImdbId');
+    const cancelEditBtn = document.getElementById('cancelEditBtn');
+    const saveEditBtn = document.getElementById('saveEditBtn');
+
+    let items = loadItems();
+    let activeContextItemId = null;
+
+    apiKeyInput.value = localStorage.getItem(KEY_STORAGE) || '';
+    apiKeyInput.addEventListener('input', () => {
+      localStorage.setItem(KEY_STORAGE, apiKeyInput.value.trim());
+    });
+
+    addBtn.addEventListener('click', addMovie);
+    exportBtn.addEventListener('click', exportItems);
+    importInput.addEventListener('change', importItems);
+    clearBtn.addEventListener('click', clearItems);
+
+    [smartSearchInput, imdbIdFilterInput, yearFilterInput, genreFilterInput, directorFilterInput, actorsFilterInput]
+      .forEach(input => input.addEventListener('input', render));
+
+    resetFiltersBtn.addEventListener('click', resetFilters);
+
+    menuToggleWatched.addEventListener('click', toggleWatchedFromMenu);
+    menuEditImdb.addEventListener('click', openEditDialog);
+    menuDelete.addEventListener('click', deleteFromMenu);
+
+    cancelEditBtn.addEventListener('click', () => editDialog.close());
+    editForm.addEventListener('submit', saveImdbEdit);
+
+    window.addEventListener('click', hideContextMenu);
+    window.addEventListener('scroll', hideContextMenu, true);
+    window.addEventListener('resize', hideContextMenu);
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') hideContextMenu();
+    });
+
+    render();
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message;
+      statusEl.style.color = isError ? '#fda4af' : '#93c5fd';
+    }
+
+    function loadItems() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveItems() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    }
+
+    function isValidYouTubeUrl(value) {
+      try {
+        const url = new URL(value);
+        return /(^|\.)youtube\.com$/.test(url.hostname) || url.hostname === 'youtu.be' || url.hostname.endsWith('.youtube.com');
+      } catch {
+        return false;
+      }
+    }
+
+    function normalizeText(value) {
+      return String(value || '').toLowerCase().trim();
+    }
+
+    function fuzzyIncludes(text, query) {
+      const haystack = normalizeText(text);
+      const needle = normalizeText(query);
+      if (!needle) return true;
+      if (haystack.includes(needle)) return true;
+      const words = needle.split(/\s+/).filter(Boolean);
+      return words.every(word => haystack.includes(word));
+    }
+
+    async function addMovie() {
+      const apiKey = apiKeyInput.value.trim();
+      const youtubeUrl = youtubeUrlInput.value.trim();
+      const title = movieTitleInput.value.trim();
+      const year = movieYearInput.value.trim();
+
+      if (!apiKey) {
+        setStatus('Please add your OMDb API key first.', true);
+        return;
+      }
+
+      if (!youtubeUrl || !isValidYouTubeUrl(youtubeUrl)) {
+        setStatus('Please paste a valid YouTube link.', true);
+        return;
+      }
+
+      if (!title) {
+        setStatus('Please enter the movie title so the app can look it up properly.', true);
+        return;
+      }
+
+      setStatus('Looking up movie details...');
+      addBtn.disabled = true;
+      addBtn.textContent = 'Adding...';
+
+      try {
+        const movie = await fetchMovieDataByTitle(title, year, apiKey);
+        const newItem = createItemFromMovieData(movie, youtubeUrl, title, false);
+        items.unshift(newItem);
+        saveItems();
+        render();
+
+        youtubeUrlInput.value = '';
+        movieTitleInput.value = '';
+        movieYearInput.value = '';
+        setStatus(`Added “${newItem.title}” to your shelf.`);
+      } catch (error) {
+        setStatus(error.message || 'Could not fetch movie details.', true);
+      } finally {
+        addBtn.disabled = false;
+        addBtn.textContent = 'Add to shelf';
+      }
+    }
+
+    function createItemFromMovieData(movie, youtubeUrl, fallbackTitle, watched = false) {
+      return {
+        id: crypto.randomUUID(),
+        youtubeUrl,
+        customTitle: fallbackTitle,
+        savedAt: new Date().toISOString(),
+        watched,
+        title: movie.Title || fallbackTitle,
+        year: movie.Year || '',
+        runtime: movie.Runtime || '',
+        genre: movie.Genre || '',
+        plot: movie.Plot || '',
+        rating: movie.imdbRating || '',
+        poster: movie.Poster && movie.Poster !== 'N/A' ? movie.Poster : '',
+        imdbID: movie.imdbID || '',
+        director: movie.Director || '',
+        actors: movie.Actors || '',
+      };
+    }
+
+    async function fetchMovieDataByTitle(title, year, apiKey) {
+      const params = new URLSearchParams({
+        apikey: apiKey,
+        t: title,
+        plot: 'short'
+      });
+
+      if (year) params.set('y', year);
+      return fetchMovie(params);
+    }
+
+    async function fetchMovieDataByImdbId(imdbID, apiKey) {
+      const params = new URLSearchParams({
+        apikey: apiKey,
+        i: imdbID,
+        plot: 'short'
+      });
+      return fetchMovie(params);
+    }
+
+    async function fetchMovie(params) {
+      const response = await fetch(`https://www.omdbapi.com/?${params.toString()}`);
+      if (!response.ok) throw new Error('Movie lookup failed.');
+      const data = await response.json();
+      if (data.Response === 'False') {
+        throw new Error(data.Error || 'Movie not found.');
+      }
+      return data;
+    }
+
+    function render() {
+      const filtered = getFilteredItems();
+      const unwatched = filtered.filter(item => !item.watched);
+      const watched = filtered.filter(item => item.watched);
+
+      unwatchedCount.textContent = `${unwatched.length} shown`;
+      watchedCount.textContent = `${watched.length} shown`;
+
+      renderShelf(unwatchedShelf, unwatched, 'No unwatched movies match your filters.');
+      renderShelf(watchedShelf, watched, 'No watched movies match your filters.');
+    }
+
+    function getFilteredItems() {
+      const smart = smartSearchInput.value.trim();
+      const imdbId = normalizeText(imdbIdFilterInput.value);
+      const year = normalizeText(yearFilterInput.value);
+      const genre = normalizeText(genreFilterInput.value);
+      const director = normalizeText(directorFilterInput.value);
+      const actors = normalizeText(actorsFilterInput.value);
+
+      return items.filter(item => {
+        const smartHaystack = [
+          item.title,
+          item.customTitle,
+          item.plot,
+          item.genre,
+          item.director,
+          item.actors,
+          item.year,
+          item.imdbID
+        ].join(' ');
+
+        return fuzzyIncludes(smartHaystack, smart)
+          && normalizeText(item.imdbID).includes(imdbId)
+          && normalizeText(item.year).includes(year)
+          && normalizeText(item.genre).includes(genre)
+          && normalizeText(item.director).includes(director)
+          && normalizeText(item.actors).includes(actors);
+      });
+    }
+
+    function renderShelf(target, list, emptyMessage) {
+      if (!list.length) {
+        target.innerHTML = `<div class="empty">${escapeHtml(emptyMessage)}</div>`;
+        return;
+      }
+
+      target.innerHTML = list.map(item => `
+        <article class="card">
+          ${item.watched ? '<div class="watched-ribbon">Watched</div>' : ''}
+          <a class="poster-link" href="${escapeHtml(item.youtubeUrl)}" target="_blank" rel="noopener noreferrer" title="Open on YouTube" oncontextmenu="openContextMenu(event, '${item.id}')">
+            ${item.poster
+              ? `<img class="poster" src="${escapeHtml(item.poster)}" alt="Poster for ${escapeHtml(item.title)}" loading="lazy" />`
+              : `<div class="poster placeholder">No poster found</div>`}
+          </a>
+          <div class="content">
+            <div class="title">${escapeHtml(item.title)}</div>
+            <div class="meta">
+              ${escapeHtml(item.year || '')}
+              ${item.runtime ? ` • ${escapeHtml(item.runtime)}` : ''}
+              ${item.rating ? ` • IMDb ${escapeHtml(item.rating)}` : ''}
+            </div>
+            ${item.genre ? `<div class="meta"><strong>Genre:</strong> ${escapeHtml(item.genre)}</div>` : ''}
+            ${item.director ? `<div class="meta"><strong>Director:</strong> ${escapeHtml(item.director)}</div>` : ''}
+            ${item.actors ? `<div class="meta"><strong>Actors:</strong> ${escapeHtml(item.actors)}</div>` : ''}
+            ${item.imdbID ? `<div class="meta"><strong>IMDb ID:</strong> ${escapeHtml(item.imdbID)}</div>` : ''}
+            ${item.plot ? `<div class="plot">${escapeHtml(item.plot)}</div>` : ''}
+            <div class="actions">
+              <a href="${escapeHtml(item.youtubeUrl)}" target="_blank" rel="noopener noreferrer">Watch</a>
+              <button class="secondary-action" type="button" onclick="toggleWatched('${item.id}')">${item.watched ? 'Mark unwatched' : 'Mark watched'}</button>
+            </div>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    function toggleWatched(id) {
+      items = items.map(item => item.id === id ? { ...item, watched: !item.watched } : item);
+      saveItems();
+      render();
+      const updated = items.find(item => item.id === id);
+      setStatus(updated?.watched ? 'Marked as watched.' : 'Marked as unwatched.');
+    }
+
+    function removeItem(id) {
+      items = items.filter(item => item.id !== id);
+      saveItems();
+      render();
+      setStatus('Movie deleted.');
+    }
+
+    function openContextMenu(event, id) {
+      event.preventDefault();
+      activeContextItemId = id;
+      const item = items.find(entry => entry.id === id);
+      menuToggleWatched.textContent = item?.watched ? 'Mark as unwatched' : 'Mark as watched';
+      contextMenu.style.display = 'block';
+      contextMenu.setAttribute('aria-hidden', 'false');
+
+      const menuWidth = 220;
+      const menuHeight = 140;
+      const left = Math.min(event.clientX, window.innerWidth - menuWidth - 12);
+      const top = Math.min(event.clientY, window.innerHeight - menuHeight - 12);
+      contextMenu.style.left = `${left}px`;
+      contextMenu.style.top = `${top}px`;
+    }
+
+    function hideContextMenu() {
+      contextMenu.style.display = 'none';
+      contextMenu.setAttribute('aria-hidden', 'true');
+    }
+
+    function toggleWatchedFromMenu() {
+      if (!activeContextItemId) return;
+      toggleWatched(activeContextItemId);
+      hideContextMenu();
+    }
+
+    function deleteFromMenu() {
+      if (!activeContextItemId) return;
+      removeItem(activeContextItemId);
+      hideContextMenu();
+    }
+
+    function openEditDialog() {
+      if (!activeContextItemId) return;
+      const item = items.find(entry => entry.id === activeContextItemId);
+      editImdbIdInput.value = item?.imdbID || '';
+      editDialog.showModal();
+      hideContextMenu();
+    }
+
+    async function saveImdbEdit(event) {
+      event.preventDefault();
+      const apiKey = apiKeyInput.value.trim();
+      const imdbID = editImdbIdInput.value.trim();
+      const targetId = activeContextItemId;
+
+      if (!targetId) {
+        editDialog.close();
+        return;
+      }
+
+      if (!apiKey) {
+        setStatus('Please add your OMDb API key first.', true);
+        return;
+      }
+
+      if (!/^tt\d{5,}$/.test(imdbID)) {
+        setStatus('Please enter a valid IMDb ID like tt0110357.', true);
+        return;
+      }
+
+      saveEditBtn.disabled = true;
+      saveEditBtn.textContent = 'Saving...';
+      setStatus('Updating movie details...');
+
+      try {
+        const movie = await fetchMovieDataByImdbId(imdbID, apiKey);
+        items = items.map(item => {
+          if (item.id !== targetId) return item;
+          return {
+            ...item,
+            title: movie.Title || item.title,
+            year: movie.Year || item.year,
+            runtime: movie.Runtime || item.runtime,
+            genre: movie.Genre || item.genre,
+            plot: movie.Plot || item.plot,
+            rating: movie.imdbRating || item.rating,
+            poster: movie.Poster && movie.Poster !== 'N/A' ? movie.Poster : '',
+            imdbID: movie.imdbID || imdbID,
+            director: movie.Director || item.director,
+            actors: movie.Actors || item.actors,
+          };
+        });
+
+        saveItems();
+        render();
+        editDialog.close();
+        setStatus('Identification updated and details refreshed.');
+      } catch (error) {
+        setStatus(error.message || 'Could not update that IMDb ID.', true);
+      } finally {
+        saveEditBtn.disabled = false;
+        saveEditBtn.textContent = 'Save changes';
+      }
+    }
+
+    function exportItems() {
+      const blob = new Blob([JSON.stringify(items, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'youtube-movie-shelf-backup.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus('Backup exported.');
+    }
+
+    function importItems(event) {
+      const file = event.target.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const imported = JSON.parse(reader.result);
+          if (!Array.isArray(imported)) throw new Error('Invalid file format.');
+          items = imported.map(item => ({ watched: false, director: '', actors: '', ...item }));
+          saveItems();
+          render();
+          setStatus('Backup imported.');
+        } catch {
+          setStatus('That file could not be imported.', true);
+        }
+      };
+      reader.readAsText(file);
+      event.target.value = '';
+    }
+
+    function clearItems() {
+      if (!confirm('Clear your whole movie shelf?')) return;
+      items = [];
+      saveItems();
+      render();
+      setStatus('All movies cleared.');
+    }
+
+    function resetFilters() {
+      smartSearchInput.value = '';
+      imdbIdFilterInput.value = '';
+      yearFilterInput.value = '';
+      genreFilterInput.value = '';
+      directorFilterInput.value = '';
+      actorsFilterInput.value = '';
+      render();
+      setStatus('Filters cleared.');
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    window.toggleWatched = toggleWatched;
+    window.removeItem = removeItem;
+    window.openContextMenu = openContextMenu;
+  </script>
+</body>
+</html>
