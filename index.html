@@ -60,7 +60,7 @@
       line-height: 1.55;
     }
 
-    .settings, .form-panel, .filters-panel, .section-shell {
+    .settings, .auth-panel, .config-panel, .form-panel, .filters-panel, .section-shell {
       background: rgba(17,24,39,.92);
       border: 1px solid rgba(255,255,255,.08);
       border-radius: var(--radius);
@@ -93,7 +93,7 @@
       color: #e2e8f0;
     }
 
-    input {
+    input, textarea {
       width: 100%;
       padding: 14px 16px;
       border-radius: 14px;
@@ -102,9 +102,15 @@
       color: var(--text);
       font-size: 1rem;
       outline: none;
+      font-family: inherit;
     }
 
-    input:focus {
+    textarea {
+      min-height: 180px;
+      resize: vertical;
+    }
+
+    input:focus, textarea:focus {
       border-color: var(--accent-2);
       box-shadow: 0 0 0 3px rgba(251,113,133,.15);
     }
@@ -136,6 +142,11 @@
       box-shadow: none;
     }
 
+    button:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
     .status {
       margin-top: 10px;
       min-height: 24px;
@@ -149,7 +160,7 @@
       line-height: 1.55;
     }
 
-    .section-header {
+    .auth-row, .section-header {
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -157,6 +168,17 @@
       margin-bottom: 18px;
       flex-wrap: wrap;
     }
+
+    .user-chip {
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.1);
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+
+    .hidden { display: none !important; }
 
     .count-badge {
       color: var(--muted);
@@ -357,6 +379,7 @@
       background: rgba(255,255,255,.08);
       padding: 2px 6px;
       border-radius: 8px;
+      word-break: break-word;
     }
 
     @media (max-width: 900px) {
@@ -372,8 +395,47 @@
       <h1>Your YouTube Movie Shelf</h1>
       <p class="sub">
         Save YouTube movie links and display them like a mini streaming library. Right click a poster for quick actions,
-        mark films as watched, and search by title, IMDb ID, year, genre, director, or actors.
+        mark films as watched, and search by title, IMDb ID, year, genre, director, or actors. Sign in with Google to keep it synced across devices.
       </p>
+    </section>
+
+    <section class="auth-panel">
+      <div class="auth-row" style="margin-bottom:10px;">
+        <div>
+          <h2>Account</h2>
+          <div class="small">Sign in once and your shelf follows you across devices.</div>
+        </div>
+        <div class="row">
+          <div id="userChip" class="user-chip">Not signed in</div>
+          <button id="signInBtn" type="button">Sign in with Google</button>
+          <button id="signOutBtn" class="ghost hidden" type="button">Sign out</button>
+        </div>
+      </div>
+      <div id="authStatus" class="status"></div>
+    </section>
+
+    <section class="config-panel">
+      <h2 style="margin-bottom:10px;">Firebase setup</h2>
+      <div class="small">
+        Paste your Firebase web app config here exactly as Firebase shows it after you create a web app with the <code>&lt;/&gt;</code> icon.
+      </div>
+      <div class="field" style="margin-top:14px;">
+        <label for="firebaseConfigInput">Firebase config object</label>
+        <textarea id="firebaseConfigInput" placeholder='{
+  apiKey: "...",
+  authDomain: "...",
+  projectId: "...",
+  storageBucket: "...",
+  messagingSenderId: "...",
+  appId: "..."
+}'></textarea>
+      </div>
+      <div class="row" style="margin-top:14px;">
+        <button id="saveConfigBtn" class="secondary" type="button">Save config on this device</button>
+      </div>
+      <div class="small" style="margin-top:10px;">
+        After saving the config, sign in with Google. Later you can paste this config directly into the file before uploading to GitHub Pages if you want.
+      </div>
     </section>
 
     <section class="settings">
@@ -384,7 +446,7 @@
         </div>
       </div>
       <p class="small">
-        Your key is stored only in your browser on this device. To use this on other devices, host this page online and use the same key there.
+        Your OMDb key is stored only in your browser on this device.
       </p>
     </section>
 
@@ -473,7 +535,7 @@
   <div id="contextMenu" class="context-menu" role="menu" aria-hidden="true">
     <button id="menuToggleWatched" type="button">Mark as watched</button>
     <button id="menuEditImdb" type="button">Edit identification</button>
-    <button id="menuDelete" type="button">Delete</button>
+    <button id="menuDelete" type="button">Remove from my shelves</button>
   </div>
 
   <dialog id="editDialog">
@@ -493,9 +555,26 @@
     </form>
   </dialog>
 
-  <script>
+  <script type="module">
+    import { initializeApp, getApps } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged
+    } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+    import {
+      getFirestore,
+      doc,
+      setDoc,
+      onSnapshot,
+      serverTimestamp
+    } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+
     const STORAGE_KEY = 'ytMovieShelfItems';
     const KEY_STORAGE = 'ytMovieShelfOmdbKey';
+    const FIREBASE_CONFIG_STORAGE = 'ytMovieShelfFirebaseConfig';
 
     const apiKeyInput = document.getElementById('apiKey');
     const youtubeUrlInput = document.getElementById('youtubeUrl');
@@ -531,12 +610,64 @@
     const cancelEditBtn = document.getElementById('cancelEditBtn');
     const saveEditBtn = document.getElementById('saveEditBtn');
 
+    const userChip = document.getElementById('userChip');
+    const signInBtn = document.getElementById('signInBtn');
+    const signOutBtn = document.getElementById('signOutBtn');
+    const authStatusEl = document.getElementById('authStatus');
+    const firebaseConfigInput = document.getElementById('firebaseConfigInput');
+    const saveConfigBtn = document.getElementById('saveConfigBtn');
+
     let items = loadItems();
     let activeContextItemId = null;
+    let firebaseApp = null;
+    let auth = null;
+    let db = null;
+    let currentUser = null;
+    let unsubscribeShelf = null;
 
     apiKeyInput.value = localStorage.getItem(KEY_STORAGE) || '';
+    firebaseConfigInput.value = localStorage.getItem(FIREBASE_CONFIG_STORAGE) || '';
+
     apiKeyInput.addEventListener('input', () => {
       localStorage.setItem(KEY_STORAGE, apiKeyInput.value.trim());
+    });
+
+    saveConfigBtn.addEventListener('click', async () => {
+      const raw = firebaseConfigInput.value.trim();
+      if (!raw) {
+        setAuthStatus('Paste your Firebase config first.', true);
+        return;
+      }
+      localStorage.setItem(FIREBASE_CONFIG_STORAGE, raw);
+      const ok = await startFirebase(raw);
+      if (ok) setAuthStatus('Firebase config saved on this device.');
+    });
+
+    signInBtn.addEventListener('click', async () => {
+      if (!auth) {
+        const raw = firebaseConfigInput.value.trim() || localStorage.getItem(FIREBASE_CONFIG_STORAGE) || '';
+        if (!raw) {
+          setAuthStatus('Save your Firebase config first.', true);
+          return;
+        }
+        const ok = await startFirebase(raw);
+        if (!ok) return;
+      }
+
+      try {
+        const provider = new GoogleAuthProvider();
+        await signInWithPopup(auth, provider);
+      } catch (error) {
+        setAuthStatus(error.message || 'Sign-in failed.', true);
+      }
+    });
+
+    signOutBtn.addEventListener('click', async () => {
+      try {
+        if (auth) await signOut(auth);
+      } catch (error) {
+        setAuthStatus(error.message || 'Sign-out failed.', true);
+      }
     });
 
     addBtn.addEventListener('click', addMovie);
@@ -564,10 +695,16 @@
     });
 
     render();
+    autoBootFirebase();
 
     function setStatus(message, isError = false) {
       statusEl.textContent = message;
       statusEl.style.color = isError ? '#fda4af' : '#93c5fd';
+    }
+
+    function setAuthStatus(message, isError = false) {
+      authStatusEl.textContent = message;
+      authStatusEl.style.color = isError ? '#fda4af' : '#93c5fd';
     }
 
     function loadItems() {
@@ -581,6 +718,96 @@
 
     function saveItems() {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    }
+
+    function safeParseConfig(raw) {
+      try {
+        return Function(`"use strict"; return (${raw});`)();
+      } catch {
+        return null;
+      }
+    }
+
+    async function autoBootFirebase() {
+      const raw = localStorage.getItem(FIREBASE_CONFIG_STORAGE) || '';
+      if (!raw) return;
+      await startFirebase(raw, true);
+    }
+
+    async function startFirebase(rawConfig, quiet = false) {
+      const config = safeParseConfig(rawConfig);
+      if (!config || !config.apiKey || !config.projectId || !config.appId) {
+        if (!quiet) setAuthStatus('That Firebase config does not look valid.', true);
+        return false;
+      }
+
+      try {
+        firebaseApp = getApps().length ? getApps()[0] : initializeApp(config);
+        auth = getAuth(firebaseApp);
+        db = getFirestore(firebaseApp);
+
+        onAuthStateChanged(auth, (user) => {
+          currentUser = user;
+          updateAuthUi();
+
+          if (unsubscribeShelf) {
+            unsubscribeShelf();
+            unsubscribeShelf = null;
+          }
+
+          if (user) {
+            listenToShelf(user.uid);
+          } else {
+            items = loadItems();
+            render();
+          }
+        });
+
+        if (!quiet) setAuthStatus('Firebase is ready on this device.');
+        return true;
+      } catch (error) {
+        if (!quiet) setAuthStatus(error.message || 'Firebase could not start.', true);
+        return false;
+      }
+    }
+
+    function updateAuthUi() {
+      if (currentUser) {
+        userChip.textContent = currentUser.email || 'Signed in';
+        signInBtn.classList.add('hidden');
+        signOutBtn.classList.remove('hidden');
+      } else {
+        userChip.textContent = 'Not signed in';
+        signInBtn.classList.remove('hidden');
+        signOutBtn.classList.add('hidden');
+      }
+    }
+
+    function listenToShelf(uid) {
+      const shelfRef = doc(db, 'movieShelves', uid);
+      unsubscribeShelf = onSnapshot(shelfRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          items = Array.isArray(data.items) ? data.items : [];
+          saveItems();
+          render();
+          setAuthStatus('Shelf synced.');
+        } else {
+          saveShelfToCloud();
+        }
+      }, (error) => {
+        setAuthStatus(error.message || 'Could not sync shelf.', true);
+      });
+    }
+
+    async function saveShelfToCloud() {
+      if (!currentUser || !db) return;
+      const shelfRef = doc(db, 'movieShelves', currentUser.uid);
+      await setDoc(shelfRef, {
+        items,
+        updatedAt: serverTimestamp(),
+        email: currentUser.email || ''
+      }, { merge: true });
     }
 
     function isValidYouTubeUrl(value) {
@@ -611,6 +838,11 @@
       const title = movieTitleInput.value.trim();
       const year = movieYearInput.value.trim();
 
+      if (!currentUser) {
+        setStatus('Please sign in first so your shelf can sync.', true);
+        return;
+      }
+
       if (!apiKey) {
         setStatus('Please add your OMDb API key first.', true);
         return;
@@ -636,11 +868,12 @@
         items.unshift(newItem);
         saveItems();
         render();
+        await saveShelfToCloud();
 
         youtubeUrlInput.value = '';
         movieTitleInput.value = '';
         movieYearInput.value = '';
-        setStatus(`Added “${newItem.title}” to your shelf.`);
+        setStatus(`Added “${newItem.title}” to your synced shelf.`);
       } catch (error) {
         setStatus(error.message || 'Could not fetch movie details.', true);
       } finally {
@@ -775,19 +1008,29 @@
       `).join('');
     }
 
-    function toggleWatched(id) {
+    async function toggleWatched(id) {
       items = items.map(item => item.id === id ? { ...item, watched: !item.watched } : item);
       saveItems();
       render();
       const updated = items.find(item => item.id === id);
       setStatus(updated?.watched ? 'Marked as watched.' : 'Marked as unwatched.');
+      try {
+        await saveShelfToCloud();
+      } catch (error) {
+        setStatus(error.message || 'Could not sync watched status.', true);
+      }
     }
 
-    function removeItem(id) {
+    async function removeItem(id) {
       items = items.filter(item => item.id !== id);
       saveItems();
       render();
-      setStatus('Movie deleted.');
+      setStatus('Movie removed for this device and synced to your account.');
+      try {
+        await saveShelfToCloud();
+      } catch (error) {
+        setStatus(error.message || 'Could not sync removal.', true);
+      }
     }
 
     function openContextMenu(event, id) {
@@ -877,6 +1120,7 @@
 
         saveItems();
         render();
+        await saveShelfToCloud();
         editDialog.close();
         setStatus('Identification updated and details refreshed.');
       } catch (error) {
@@ -898,18 +1142,19 @@
       setStatus('Backup exported.');
     }
 
-    function importItems(event) {
+    async function importItems(event) {
       const file = event.target.files?.[0];
       if (!file) return;
 
       const reader = new FileReader();
-      reader.onload = () => {
+      reader.onload = async () => {
         try {
           const imported = JSON.parse(reader.result);
           if (!Array.isArray(imported)) throw new Error('Invalid file format.');
           items = imported.map(item => ({ watched: false, director: '', actors: '', ...item }));
           saveItems();
           render();
+          await saveShelfToCloud();
           setStatus('Backup imported.');
         } catch {
           setStatus('That file could not be imported.', true);
@@ -919,12 +1164,17 @@
       event.target.value = '';
     }
 
-    function clearItems() {
+    async function clearItems() {
       if (!confirm('Clear your whole movie shelf?')) return;
       items = [];
       saveItems();
       render();
-      setStatus('All movies cleared.');
+      try {
+        await saveShelfToCloud();
+        setStatus('All movies cleared.');
+      } catch (error) {
+        setStatus(error.message || 'Could not sync clear action.', true);
+      }
     }
 
     function resetFilters() {
