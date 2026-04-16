@@ -414,30 +414,6 @@
       <div id="authStatus" class="status"></div>
     </section>
 
-    <section class="config-panel">
-      <h2 style="margin-bottom:10px;">Firebase setup</h2>
-      <div class="small">
-        Paste your Firebase web app config here exactly as Firebase shows it after you create a web app with the <code>&lt;/&gt;</code> icon.
-      </div>
-      <div class="field" style="margin-top:14px;">
-        <label for="firebaseConfigInput">Firebase config object</label>
-        <textarea id="firebaseConfigInput" placeholder='{
-  apiKey: "...",
-  authDomain: "...",
-  projectId: "...",
-  storageBucket: "...",
-  messagingSenderId: "...",
-  appId: "..."
-}'></textarea>
-      </div>
-      <div class="row" style="margin-top:14px;">
-        <button id="saveConfigBtn" class="secondary" type="button">Save config on this device</button>
-      </div>
-      <div class="small" style="margin-top:10px;">
-        After saving the config, sign in with Google. Later you can paste this config directly into the file before uploading to GitHub Pages if you want.
-      </div>
-    </section>
-
     <section class="settings">
       <div class="grid">
         <div class="field span-12">
@@ -574,7 +550,14 @@
 
     const STORAGE_KEY = 'ytMovieShelfItems';
     const KEY_STORAGE = 'ytMovieShelfOmdbKey';
-    const FIREBASE_CONFIG_STORAGE = 'ytMovieShelfFirebaseConfig';
+    const FIREBASE_CONFIG = {
+        apiKey: "AIzaSyAnWLZfMv-K84DXkxdGfQayWSb6eTl9_bc",
+        authDomain: "movie-shelf-5fd35.firebaseapp.com",
+        projectId: "movie-shelf-5fd35",
+        storageBucket: "movie-shelf-5fd35.firebasestorage.app",
+        messagingSenderId: "625422104489",
+        appId: "1:625422104489:web:4ec128389cab8a629db6b8"
+      };
 
     const apiKeyInput = document.getElementById('apiKey');
     const youtubeUrlInput = document.getElementById('youtubeUrl');
@@ -626,33 +609,16 @@
     let unsubscribeShelf = null;
 
     apiKeyInput.value = localStorage.getItem(KEY_STORAGE) || '';
-    firebaseConfigInput.value = localStorage.getItem(FIREBASE_CONFIG_STORAGE) || '';
 
     apiKeyInput.addEventListener('input', () => {
       localStorage.setItem(KEY_STORAGE, apiKeyInput.value.trim());
     });
 
-    saveConfigBtn.addEventListener('click', async () => {
-      const raw = firebaseConfigInput.value.trim();
-      if (!raw) {
-        setAuthStatus('Paste your Firebase config first.', true);
-        return;
-      }
-      localStorage.setItem(FIREBASE_CONFIG_STORAGE, raw);
-      const ok = await startFirebase(raw);
-      if (ok) setAuthStatus('Firebase config saved on this device.');
-    });
-
     signInBtn.addEventListener('click', async () => {
-      if (!auth) {
-        const raw = firebaseConfigInput.value.trim() || localStorage.getItem(FIREBASE_CONFIG_STORAGE) || '';
-        if (!raw) {
-          setAuthStatus('Save your Firebase config first.', true);
-          return;
+        if (!auth) {
+          const ok = await startFirebase(JSON.stringify(FIREBASE_CONFIG));
+          if (!ok) return;
         }
-        const ok = await startFirebase(raw);
-        if (!ok) return;
-      }
 
       try {
         const provider = new GoogleAuthProvider();
@@ -729,10 +695,8 @@
     }
 
     async function autoBootFirebase() {
-      const raw = localStorage.getItem(FIREBASE_CONFIG_STORAGE) || '';
-      if (!raw) return;
-      await startFirebase(raw, true);
-    }
+        await startFirebase(JSON.stringify(FIREBASE_CONFIG), true);
+      }
 
     async function startFirebase(rawConfig, quiet = false) {
       const config = safeParseConfig(rawConfig);
